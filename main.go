@@ -82,10 +82,10 @@ func run(cmd *cobra.Command, args []string) {
 		logger.Fatal("Failed to create API instance", zap.Error(err))
 	}
 
-	// Fetch the zone ID using the zone name
-	zoneID, err := api.ZoneIDByName(zoneName)
-	if err != nil {
-		logger.Fatal("Failed to fetch zone ID", zap.String("zoneName", zoneName), zap.Error(err))
+	if len(hostnames) == 0 {
+		logger.Info("No readable hostnames found in the input file", zap.String("filename", inputFile))
+		return
+
 	}
 
 	// Iterate over the list of hostnames and delete each record
