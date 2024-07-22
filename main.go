@@ -121,7 +121,7 @@ func run(cmd *cobra.Command, args []string) {
 		for _, record := range records {
 			err = deleteDNSRecord(api, record)
 			if err != nil {
-				log.Printf("Error deleting record: %v", err)
+				logger.Error("Error deleting record", zap.Error(err))
 			}
 		}
 	}
@@ -161,11 +161,11 @@ func fetchDNSRecords(api *cloudflare.API, zoneID, hostname string) ([]cloudflare
 	logger.Info("Fetching Record: ", zap.String("hostname", hostname))
 	records, _, err := api.ListDNSRecords(context.Background(), cloudflare.ZoneIdentifier(zoneID), cloudflare.ListDNSRecordsParams{Name: hostname})
 	if err != nil {
-		log.Printf("Failed to fetch DNS record for %s: %v\n", hostname, err)
+		logger.Error("Failed to fetch DNS record", zap.String("hostname", hostname), zap.Error(err))
 		return nil, err
 	}
 	if len(records) == 0 {
-		log.Printf("[MOCK] No records found for %s", hostname)
+		logger.Info("No records found for", zap.String("hostname", hostname))
 	}
 	return records, nil
 }
