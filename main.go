@@ -156,7 +156,7 @@ func fetchDNSRecords(api *cloudflare.API, zoneID, hostname string) ([]cloudflare
 // Function to delete a DNS record
 func deleteDNSRecord(api *cloudflare.API, record cloudflare.DNSRecord) error {
 	if !apply {
-		logger.Info("[DRY RUN] Deleting Record: ", zap.String("recordID", record.ID), zap.String("zoneID", record.ZoneID), zap.String("name", record.Name), zap.String("type", record.Type), zap.String("content", record.Content))
+		logger.Info("[DRY RUN] Deleting Record: ", zap.String("recordID", record.ID), zap.String("zoneID", record.ZoneID), zap.String("name", record.Name), zap.String("type", record.Type), zap.String("content", record.Content), zap.Bool("proxied", *record.Proxied))
 		return nil
 	}
 	err := api.DeleteDNSRecord(context.Background(), cloudflare.ZoneIdentifier(record.ZoneID), record.ID)
