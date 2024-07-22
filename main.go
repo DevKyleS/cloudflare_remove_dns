@@ -98,7 +98,7 @@ func run(cmd *cobra.Command, args []string) {
 		// Fetch the zone ID for the given zone name
 		zoneID, err := api.ZoneIDByName(zoneName)
 		if err != nil {
-			logger.Fatal("Failed to fetch zone ID", zap.String("zoneName", zoneName), zap.Error(err))
+			logger.Error("Failed to fetch zone ID", zap.String("zoneName", zoneName), zap.Error(err))
 		}
 		// Fetch the DNS records for the given hostname
 		records, err := fetchDNSRecords(api, zoneID, hostname)
