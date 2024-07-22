@@ -16,7 +16,6 @@ import (
 var (
 	apply     bool   // Set to true for dry run, false to perform actual deletions
 	apiToken  string // Cloudflare API token
-	zoneName  string // Cloudflare Zone name
 	inputFile string // Filename for the list of DNS records to delete
 
 	logger *zap.Logger
@@ -36,12 +35,10 @@ func init() {
 	// Here we define our flags and configuration settings.
 	rootCmd.PersistentFlags().BoolVarP(&apply, "apply", "a", false, "Apply changes")
 	rootCmd.PersistentFlags().StringVarP(&apiToken, "apitoken", "t", "", "Cloudflare API token")
-	rootCmd.PersistentFlags().StringVarP(&zoneName, "zonename", "z", "", "Cloudflare Zone name")
 	rootCmd.PersistentFlags().StringVarP(&inputFile, "filename", "f", "hostnames.txt", "Filename for the list of DNS records to delete")
 
-	// Mark apiToken and zoneName as required flags
+	// Mark apiToken as required flags
 	//rootCmd.MarkPersistentFlagRequired("apitoken")
-	//rootCmd.MarkPersistentFlagRequired("zonename")
 }
 
 func main() {
@@ -49,10 +46,6 @@ func main() {
 	apiToken = os.Getenv("CLOUDFLARE_API_TOKEN")
 	if apiToken == "" {
 		logger.Fatal("CLOUDFLARE_API_TOKEN environment variable is not set")
-	}
-	zoneName = os.Getenv("CLOUDFLARE_ZONE")
-	if zoneName == "" {
-		logger.Fatal("CLOUDFLARE_ZONE environment variable is not set")
 	}
 
 	// Check if the filename for the list of DNS records to delete is set
@@ -97,10 +90,22 @@ func run(cmd *cobra.Command, args []string) {
 
 	// Iterate over the list of hostnames and delete each record
 	for _, hostname := range hostnames {
+		// Parse the zone name from the given hostname
+		zoneName, err := getZoneNameFromRecord(hostname)
+		if err != nil {
+			logger.Error("Failed to parse zone name from record", zap.String("zoneName", zoneName), zap.Error(err))
+		}
+		// Fetch the zone ID for the given zone name
+		zoneID, err := api.ZoneIDByName(zoneName)
+		if err != nil {
+			logger.Fatal("Failed to fetch zone ID", zap.String("zoneName", zoneName), zap.Error(err))
+		}
+		// Fetch the DNS records for the given hostname
 		records, err := fetchDNSRecords(api, zoneID, hostname)
 		if err != nil {
 			continue
 		}
+		// Delete the DNS records
 		for _, record := range records {
 			err = deleteDNSRecord(api, record)
 			if err != nil {
@@ -137,6 +142,18 @@ func createLogger() *zap.Logger {
 		zapcore.NewCore(fileEncoder, file, level),
 	)
 	return zap.New(core)
+}
+
+// getZoneNameFromRecord parses the zone name from a given hostname
+func getZoneNameFromRecord(hostname string) (string, error) {
+	// Split the hostname into parts.
+	parts := strings.Split(hostname, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid hostname: %s", hostname)
+	}
+
+	tld := strings.Join(parts[len(parts)-2:], ".")
+	return tld, nil
 }
 
 // Function to fetch DNS records for a given hostname
