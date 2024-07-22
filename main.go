@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"log"
 	"os"
+	"strings"
 
 	"github.com/cloudflare/cloudflare-go"
 	"github.com/spf13/cobra"
@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	apply         bool   // Set to true for dry run, false to perform actual deletions
-	apiToken      string // Cloudflare API token
-	zoneName      string // Cloudflare Zone name
-	hostnamesFile string // Filename for the list of DNS records to delete
+	apply     bool   // Set to true for dry run, false to perform actual deletions
+	apiToken  string // Cloudflare API token
+	zoneName  string // Cloudflare Zone name
+	inputFile string // Filename for the list of DNS records to delete
 
 	logger *zap.Logger
 
@@ -30,21 +30,14 @@ var (
 )
 
 func init() {
-	// Initialize Zap logger
-	//logger, err := zap.NewProduction()
 	logger = createLogger()
-	/*
-		if err != nil {
-			log.Fatal("Can't initialize zap logger", zap.Error(err))
-		}
-	*/
 	defer logger.Sync()
 
 	// Here we define our flags and configuration settings.
 	rootCmd.PersistentFlags().BoolVarP(&apply, "apply", "a", false, "Apply changes")
 	rootCmd.PersistentFlags().StringVarP(&apiToken, "apitoken", "t", "", "Cloudflare API token")
 	rootCmd.PersistentFlags().StringVarP(&zoneName, "zonename", "z", "", "Cloudflare Zone name")
-	rootCmd.PersistentFlags().StringVarP(&hostnamesFile, "filename", "f", "hostnames.txt", "Filename for the list of DNS records to delete")
+	rootCmd.PersistentFlags().StringVarP(&inputFile, "filename", "f", "hostnames.txt", "Filename for the list of DNS records to delete")
 
 	// Mark apiToken and zoneName as required flags
 	//rootCmd.MarkPersistentFlagRequired("apitoken")
@@ -63,19 +56,19 @@ func main() {
 	}
 
 	// Check if the filename for the list of DNS records to delete is set
-	if hostnamesFile == "" {
+	if inputFile == "" {
 		// check if the file exists and is readable
-		fileInfo, err := os.Stat(hostnamesFile)
+		fileInfo, err := os.Stat(inputFile)
 		if os.IsNotExist(err) {
-			logger.Fatal("File does not exist", zap.String("filename", hostnamesFile))
+			logger.Fatal("File does not exist", zap.String("filename", inputFile))
 		}
 		if fileInfo.Mode().IsDir() {
-			logger.Fatal("Path is a directory, not a file", zap.String("filename", hostnamesFile))
+			logger.Fatal("Path is a directory, not a file", zap.String("filename", inputFile))
 		}
 		if fileInfo.Mode().Perm()&0400 == 0 {
-			logger.Fatal("File is not readable", zap.String("filename", hostnamesFile))
+			logger.Fatal("File is not readable", zap.String("filename", inputFile))
 		}
-		logger.Fatal("Filename for the list of DNS records to delete is not set. Default filename: hostnames.txt", zap.String("filename", hostnamesFile))
+		logger.Fatal("Filename for the list of DNS records to delete is not set. Default filename: hostnames.txt", zap.String("filename", inputFile))
 	}
 
 	if err := rootCmd.Execute(); err != nil {
@@ -84,20 +77,10 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) {
-	// Read hostnames from file
-	file, err := os.Open(hostnamesFile)
+	// Read the list of hostnames from the input file
+	hostnames, err := readInputFile(inputFile)
 	if err != nil {
-		logger.Fatal("Failed to open file", zap.String("filename", hostnamesFile), zap.Error(err))
-	}
-	defer file.Close()
-
-	var hostnames []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		hostnames = append(hostnames, scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		logger.Fatal("Failed to read file", zap.String("filename", hostnamesFile), zap.Error(err))
+		logger.Fatal("Failed to read file", zap.String("filename", inputFile), zap.Error(err))
 	}
 
 	// Create a new API instance
@@ -182,4 +165,31 @@ func deleteDNSRecord(api *cloudflare.API, record cloudflare.DNSRecord) error {
 		return err
 	}
 	return nil
+}
+
+// readInputFile reads the input file, skipping empty lines and comments.
+func readInputFile(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var hostnames []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		// trim leading and trailing spaces
+		line := strings.TrimSpace(scanner.Text())
+		// skip comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		hostnames = append(hostnames, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return hostnames, nil
 }
