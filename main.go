@@ -181,6 +181,7 @@ func deleteDNSRecord(api *cloudflare.API, record cloudflare.DNSRecord) error {
 		logger.Error("Failed to delete DNS record", zap.String("recordID", record.ID), zap.String("name", record.Name), zap.Error(err))
 		return err
 	}
+	logger.Warn("Deleted Record: ", zap.String("recordID", record.ID), zap.String("zoneID", record.ZoneID), zap.String("name", record.Name), zap.String("type", record.Type), zap.String("content", record.Content), zap.Bool("proxied", *record.Proxied))
 	return nil
 }
 
