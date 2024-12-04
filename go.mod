@@ -3,7 +3,7 @@ module github.com/DevKyleS/cloudflare_remove_dns
 go 1.22.5
 
 require (
-	github.com/cloudflare/cloudflare-go v0.110.0
+	github.com/cloudflare/cloudflare-go v0.111.0
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 )
